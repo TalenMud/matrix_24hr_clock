@@ -20,6 +20,8 @@ matrix = rgbmatrix.RGBMatrix(
 display = framebufferio.FramebufferDisplay(matrix, auto_refresh=False)
 g = displayio.Group()
 display.root_group = g
+clouds = [{"x": random.uniform(0, 64), "y": random.randint(0, 8)} for _ in range(3)]
+cloud_speed = 1
 
 def get_text_color():
     hour = datetime.datetime.now().hour
@@ -37,23 +39,29 @@ def get_time_rn():
         min = '0' + min
     return str(hr) + ':' + min
 
+def update_clouds():
+    for cloud in clouds:
+        cloud["x"] -= cloud_speed  # Move clouds left
+        if cloud["x"] < -5:  # Reset if off screen
+            cloud["x"] = 48
+            cloud["y"] = random.randint(0, 8)
+
 def fill_display():
     curr_time = get_time_rn()
     hour, minute = curr_time.split(":")
     hour = int(hour)
     bitmap = displayio.Bitmap(64, 32, 6)
-    cloud_positions = [(random.randint(0, 64), random.randint(0, 8)) for _ in range(6)]
-   
-    if hour < 18 and hour >=6:
+    if 6 <= hour < 18:
         for y in range(32):
             for x in range(64):
                 bitmap[x, y] = 2
 # CLOUDS
-        for (x, y) in cloud_positions: 
-            for dx in range(-2, 3):
-                for dy in range(-1, 2):
+        for cloud in clouds:
+            x, y = int(cloud["x"]), cloud["y"]  # Round x for pixel grid
+            for dx in range(-2, 3):  # Cloud width (~5 pixels)
+                for dy in range(-1, 2):  # Cloud height (~3 pixels)
                     if (0 <= x+dx < 64 and 0 <= y+dy < 32 and 
-                    not (54 <= x+dx <= 63 and 0 <= y+dy <= 9)):
+                    not (54 <= x+dx <= 63 and 0 <= y+dy <= 9)): 
                         bitmap[x+dx, y+dy] = 5  # Light Gray for clouds
 
     else:
@@ -152,11 +160,18 @@ def clock():
 
 
 while True:
-    fill_display()
-    clock()
-    get_icon()
-    display.refresh(minimum_frames_per_second=0)
-    if 6<= datetime.datetime.now().hour < 18 :
-        time.sleep(5)
+    if 6 <= datetime.datetime.now().hour < 18:  # Daytime
+        update_clouds()  # Move clouds smoothly across the screen
+        fill_display()   # Draw sky + clouds
+    else:  # Nighttime
+        fill_display()   # Just draw sky + stars (no clouds)
+
+    clock()        # Always update the time
+    get_icon()     # Sun (day) or Moon (night)
+    display.refresh(minimum_frames_per_second=0)  
+
+    # Adjust speed: Daytime updates less frequently
+    if 6 <= datetime.datetime.now().hour < 18:
+        time.sleep(0.5)  # Slower updates in the day
     else:
-        time.sleep(1)
+        time.sleep(0.1)  # Faster updates at night
